@@ -1,4 +1,4 @@
-package org.stepic.java.logging;
+// package org.stepic.java.logging;
 
 import java.util.logging.*;
 
@@ -74,7 +74,8 @@ public class Main {
 
     /**
      * Created by jstar on 24.03.2017.
-     * Интерфейс, который задает класс, который может каким-либо образом обработать почтовый объект.
+     * Интерфейс, который задает класс,
+     * который может каким-либо образом обработать почтовый объект.
      */
     public static interface MailService {
         Sendable processMail(Sendable mail);
@@ -121,6 +122,7 @@ public class Main {
      */
     public static interface Sendable {
         String getFrom();
+
         String getTo();
     }
 
@@ -188,7 +190,7 @@ public class Main {
      * который вместо того, чтобы передать почтовый объект непосредственно в сервис почты,
      * последовательно передает этот объект набору третьих лиц, а затем, в конце концов,
      * передает получившийся объект непосредственно экземпляру RealMailService.
-     *
+     * <p>
      * У UntrustworthyMailWorker должен быть конструктор от массива MailService
      * ( результат вызова processMail первого элемента массива передается
      * на вход processMail второго элемента, и т. д.) и метод getRealMailService,
@@ -198,31 +200,28 @@ public class Main {
 
     public static class UntrustworthyMailWorker implements MailService {
 
-        private  RealMailService vRMS;
-        private  MailService [] vMS;
+        private RealMailService vRMS;
+        private MailService[] vMS;
 
-        public UntrustworthyMailWorker(MailService [] inMS)
-        {
+        public UntrustworthyMailWorker(MailService[] inMS) {
             vRMS = new RealMailService();
-            vMS  = new MailService[inMS.length];
+            vMS = new MailService[inMS.length];
             System.arraycopy(inMS, 0, vMS, 0, inMS.length);
             // RealMailWorker
         }
 
-        public RealMailService getRealMailService()
-        {
+        public RealMailService getRealMailService() {
             return vRMS;
         }
 
         @Override
         public Sendable processMail(Sendable mail) {
-
-            for (MailService it: vMS)
-            {
-                it.processMail(mail);
+            Sendable tmp = mail;
+            for (MailService it : vMS) {
+                tmp = it.processMail(tmp);
             }
-            vRMS.processMail(mail);
-            return mail;
+            tmp = vRMS.processMail(tmp);
+            return tmp;
         }
     }
 
@@ -236,25 +235,35 @@ public class Main {
      * 2.1) Если в качестве отправителя или получателя указан "Austin Powers",
      * то нужно написать в лог сообщение с уровнем WARN: Detected target mail correspondence: from {from} to {to} "{message}"
      * 2.2) Иначе, необходимо написать в лог сообщение с уровнем INFO: Usual correspondence: from {from} to {to}
-     *
      */
-    public class Spy implements MailService {
+    public static class Spy implements MailService {
 
         private Logger lg;
-        public  Spy(Logger inLG)
-        {
+
+        public Spy(Logger inLG) {
             lg = inLG;
 
         }
 
-
         @Override
         public Sendable processMail(Sendable mail) {
-            return null;
+
+            if (mail.getClass() == MailMessage.class) {
+                MailMessage mm = (MailMessage) mail;
+                if (mm.getFrom().contains(AUSTIN_POWERS) || mm.getTo().contains(AUSTIN_POWERS)) {
+                    lg.log(Level.WARNING,
+                            "Detected target mail correspondence: from {0} to {1} \"{2}\"",
+                            new Object[]{mm.getFrom(), mm.getTo(), mm.getMessage()});
+                } else {
+                    lg.log(Level.INFO,
+                            "Usual correspondence: from {0} to {1}",
+                            new Object[]{mm.getFrom(), mm.getTo()});
+                }
+
+            }
+            return mail;
         }
     }
-
-
 
     /**
      * Created by jstar on 24.03.2017.
@@ -262,26 +271,38 @@ public class Main {
      * Вор принимает в конструкторе переменную int – минимальную стоимость посылки, которую он будет воровать.
      * Также, в данном классе должен присутствовать метод getStolenValue,
      * который возвращает суммарную стоимость всех посылок, которые он своровал.
-     *
+     * <p>
      * Воровство происходит следующим образом: вместо посылки, которая пришла вору, он отдает новую,
-     * такую же, только с нулевой ценностью и содержимым посылки "stones instead of {content}".
+     * такую же, только с нулевой ценностью и содержимым посылки .
      */
     public static class Thief implements MailService {
         private int vMinValue;
         private static int sum = 0;
-        public  Thief(int inMin)
-        {
+
+        public Thief(int inMin) {
             vMinValue = inMin;
         }
 
-        int getStolenValue()
-        {
+        public int getStolenValue() {
             return sum;
         }
 
         @Override
         public Sendable processMail(Sendable mail) {
-            return null;
+            if (mail.getClass() == MailPackage.class) {
+                MailPackage vMP = (MailPackage) mail;
+                Package vP = vMP.getContent();
+                if (vP.getPrice() >= vMinValue) {
+                    sum += vP.getPrice();
+                    String vContent = String.format("stones instead of %s", vP.getContent());
+                    Package vFakePackage = new Package(vContent, 0);
+                    MailPackage vSwitchedMailPackage = new MailPackage(vMP.getFrom(),
+                                                                        vMP.getTo(),
+                                                                        vFakePackage);
+                    return  vSwitchedMailPackage;
+                }
+            }
+            return mail;
         }
     }
 
@@ -294,16 +315,40 @@ public class Main {
      * Если он находит посылку, состоящую из камней (содержит слово "stones"),
      * то тревога прозвучит в виде StolenPackageException.
      * Оба исключения вы должны объявить самостоятельно в виде непроверяемых исключений
-     *
      */
-    public static class Inspector implements MailService {
+    public static class Inspector implements MailService
 
-
+    {
 
         @Override
         public Sendable processMail(Sendable mail) {
-            return null;
+            if (mail.getClass() == MailPackage.class)
+            {
+                MailPackage vMP = (MailPackage) mail;
+                Package vP = vMP.getContent();
+                String vContent = vP.getContent();
+
+                if (vContent.contains(WEAPONS)  || vContent.contains(BANNED_SUBSTANCE))
+                {
+                    throw  new IllegalPackageException();
+                }
+
+                if(vContent.contains("stones"))
+                {
+                    throw  new StolenPackageException();
+                }
+            }
+            return mail;
         }
     }
 
+    public static class IllegalPackageException extends RuntimeException
+    {
+        public IllegalPackageException() { super(); }
+    }
+
+    public static  class  StolenPackageException extends RuntimeException
+    {
+        public StolenPackageException() { super(); }
+    }
 }
